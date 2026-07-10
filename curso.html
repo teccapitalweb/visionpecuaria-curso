@@ -192,6 +192,34 @@
   }
   .btn-wa svg{width:18px;height:18px;fill:#fff;}
 
+  /* ---------- verificando acceso ---------- */
+  .verificando-overlay{
+    position:fixed;
+    inset:0;
+    background:var(--bg);
+    z-index:200;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:18px;
+    text-align:center;
+    padding:24px;
+  }
+  .verificando-overlay.oculto{display:none;}
+  .spinner{
+    width:38px;height:38px;
+    border-radius:50%;
+    border:3px solid var(--line);
+    border-top-color:var(--green);
+    animation:girar 0.8s linear infinite;
+  }
+  @keyframes girar{to{transform:rotate(360deg);}}
+  .verificando-overlay p{color:var(--ink-dim);font-size:0.95rem;max-width:320px;}
+  @media (prefers-reduced-motion: reduce){
+    .spinner{animation:none;border-top-color:var(--green);}
+  }
+
   footer{
     padding:26px 0;
     text-align:center;
@@ -381,6 +409,59 @@
 </style>
 </head>
 <body>
+
+<div class="verificando-overlay" id="verificandoOverlay">
+  <div class="spinner"></div>
+  <p>Verificando tu acceso al curso...</p>
+</div>
+
+<script>
+  // ------------------------------------------------------------
+  // Filtro de acceso: solo entra quien tenga un session_id de
+  // Stripe verificado como pagado (o ya lo haya verificado antes
+  // en este mismo navegador).
+  // ------------------------------------------------------------
+  (function(){
+    var ENDPOINT_VERIFICACION = 'https://PEGA_AQUI_TU_URL_DE_RAILWAY/verificar-pago';
+    var URL_LANDING_VENTA = 'index.html';
+    var params = new URLSearchParams(window.location.search);
+    var sessionId = params.get('session_id');
+    var overlay = document.getElementById('verificandoOverlay');
+
+    function ocultarOverlay(){
+      overlay.classList.add('oculto');
+    }
+    function mandarAPagar(){
+      window.location.href = URL_LANDING_VENTA;
+    }
+
+    // Si este navegador ya verificó acceso antes, no volvemos a preguntar
+    if(localStorage.getItem('vp_acceso_verificado') === '1'){
+      ocultarOverlay();
+      return;
+    }
+
+    if(!sessionId){
+      mandarAPagar();
+      return;
+    }
+
+    fetch(ENDPOINT_VERIFICACION + '?session_id=' + encodeURIComponent(sessionId))
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        if(data && data.pagado){
+          localStorage.setItem('vp_acceso_verificado', '1');
+          ocultarOverlay();
+        } else {
+          mandarAPagar();
+        }
+      })
+      .catch(function(){
+        // Si el servidor de verificación no responde, no dejamos pasar por seguridad
+        mandarAPagar();
+      });
+  })();
+</script>
 
 <header>
   <div class="wrap">
@@ -575,7 +656,7 @@
   function marcarComoInstalado(){
     localStorage.setItem('vp_app_instalada', '1');
     btnFooter.classList.add('instalado');
-    textoFooter.textContent = '✓ Descargado';
+    textoFooter.textContent = 'Descargado';
   }
 
   function appYaInstalada(){
