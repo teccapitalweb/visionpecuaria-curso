@@ -199,6 +199,35 @@
     color:var(--ink-dim);
     border-top:1px solid var(--line);
   }
+  .footer-instalar{
+    display:flex;
+    justify-content:center;
+    padding-top:30px;
+  }
+  .btn-descargar-footer{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    background:var(--bg);
+    border:1.5px solid var(--ink);
+    color:var(--ink);
+    font-family:'Work Sans',sans-serif;
+    font-weight:600;
+    font-size:0.85rem;
+    padding:11px 20px;
+    border-radius:100px;
+    cursor:pointer;
+    transition:background .2s ease, color .2s ease, border-color .2s ease;
+  }
+  .btn-descargar-footer:hover{background:var(--ink);color:var(--bg);}
+  .btn-descargar-footer svg{width:16px;height:16px;}
+  .btn-descargar-footer.instalado{
+    border-color:var(--green);
+    color:var(--green);
+    cursor:default;
+    pointer-events:none;
+  }
+  .btn-descargar-footer.instalado:hover{background:var(--bg);color:var(--green);}
 
   /* ---------- banner de instalar app ---------- */
   .banner-instalar{
@@ -475,6 +504,12 @@
   </div>
 </section>
 
+<div class="footer-instalar">
+  <button class="btn-descargar-footer" id="btnDescargarFooter" onclick="instalarApp()">
+    <span id="textoDescargarFooter">Descargar app</span>
+  </button>
+</div>
+
 <footer>© 2026 Visión Pecuaria. Todos los derechos reservados.</footer>
 
 <div class="modal-overlay" id="modalVideo">
@@ -533,17 +568,32 @@
 
   var eventoInstalacion = null;
   var banner = document.getElementById('bannerInstalar');
+  var btnFooter = document.getElementById('btnDescargarFooter');
+  var textoFooter = document.getElementById('textoDescargarFooter');
+  var UN_DIA_MS = 24 * 60 * 60 * 1000;
+
+  function marcarComoInstalado(){
+    localStorage.setItem('vp_app_instalada', '1');
+    btnFooter.classList.add('instalado');
+    textoFooter.textContent = '✓ Descargado';
+  }
+
+  function appYaInstalada(){
+    return localStorage.getItem('vp_app_instalada') === '1' ||
+           window.matchMedia('(display-mode: standalone)').matches ||
+           window.navigator.standalone === true;
+  }
 
   function mostrarBanner(){
-    if(localStorage.getItem('vp_banner_cerrado') === '1') return;
-    if(yaInstalada()) return;
+    if(appYaInstalada()) return;
+    var cerradoEn = localStorage.getItem('vp_banner_cerrado_ts');
+    if(cerradoEn && (Date.now() - parseInt(cerradoEn, 10)) < UN_DIA_MS) return;
     banner.classList.add('visible');
-    // pequeño delay para que la transición de entrada se vea
     setTimeout(function(){ banner.classList.add('mostrado'); }, 50);
   }
   function cerrarBanner(){
     banner.classList.remove('mostrado');
-    localStorage.setItem('vp_banner_cerrado', '1');
+    localStorage.setItem('vp_banner_cerrado_ts', Date.now().toString());
     setTimeout(function(){ banner.classList.remove('visible'); }, 400);
   }
 
@@ -555,21 +605,23 @@
 
   window.addEventListener('appinstalled', function(){
     cerrarBanner();
+    marcarComoInstalado();
     eventoInstalacion = null;
   });
 
   function esIOS(){
     return /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
   }
-  function yaInstalada(){
-    return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-  }
 
   function instalarApp(){
+    if(appYaInstalada()) return;
     if(eventoInstalacion){
       eventoInstalacion.prompt();
-      eventoInstalacion.userChoice.then(function(){
+      eventoInstalacion.userChoice.then(function(resultado){
         eventoInstalacion = null;
+        if(resultado.outcome === 'accepted'){
+          marcarComoInstalado();
+        }
         cerrarBanner();
       });
     } else if(esIOS()){
@@ -578,10 +630,15 @@
   }
   function cerrarIosModal(){
     document.getElementById('iosModal').classList.remove('abierto');
+    // en iOS no hay forma de confirmar la instalación real, así que al cerrar
+    // las instrucciones asumimos que la siguió y dejamos de insistir
+    marcarComoInstalado();
+    cerrarBanner();
   }
 
-  // En iPhone no existe beforeinstallprompt, así que mostramos el banner directo si no está ya instalada
-  if(esIOS()){
+  if(appYaInstalada()){
+    marcarComoInstalado();
+  } else if(esIOS()){
     mostrarBanner();
   }
 </script>
